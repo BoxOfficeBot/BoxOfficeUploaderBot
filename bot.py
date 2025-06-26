@@ -12,9 +12,11 @@ init_db()
 
 app = Client("BoxOfficeUploaderBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+
 @app.on_message(filters.private & (filters.document | filters.video))
 async def handle_upload(client, message):
     await message.reply("🎬 خوش آمدی به باکس‌آفیس! برای تو بهترین فیلم‌ها رو داریم! 🍿✨")
+
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name or "file"
@@ -24,11 +26,14 @@ async def handle_upload(client, message):
     else:
         await message.reply("فایل باید ویدیو یا سند باشد.")
         return
+
     file_row_id = save_file(file_id, file_name)
     link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
-    await message.reply(f"✅ فایل با موفقیت آپلود و ذخیره شد.
-📥 لینک دانلود:
-{link}")
+
+    await message.reply(
+        f"✅ فایل با موفقیت آپلود و ذخیره شد.\n📥 لینک دانلود:\n{link}"
+    )
+
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
@@ -40,19 +45,16 @@ async def start(client, message):
                 file_data = get_file(int(file_row_id))
                 if file_data:
                     file_id, file_name = file_data
+
+                    warning = await message.reply("⏳ لطفاً فایل را ذخیره کنید، تا ۳۰ ثانیه دیگر حذف خواهد شد!")
                     sent_message = await message.reply_video(
                         video=file_id,
-                        caption=(
-                            "❗ فایل پس از **دو دقیقه** حذف خواهد شد.
-"
-                            "حتماً ابتدا **دانلود** کنید.
-
-"
-                            "📌 برای پخش زیرنویس، از **MX Player** استفاده کنید."
-                        )
+                        caption="🎬 فایل شما آماده است. لطفاً سریعاً آن را ذخیره کنید!"
                     )
-                    await asyncio.sleep(120)
+
+                    await asyncio.sleep(30)
                     await sent_message.delete()
+                    await warning.delete()
                     await message.delete()
                     return
                 else:
@@ -60,10 +62,10 @@ async def start(client, message):
                     return
         await message.reply("❌ پارامتر شروع نامعتبر است.")
     else:
-        await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.
-مثال:
-/start file_1")
+        await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.\nمثال:\n/start file_1")
 
+
+# === Flask Server for Render Keep-Alive ===
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
