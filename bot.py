@@ -26,9 +26,9 @@ async def handle_upload(client, message):
         return
     file_row_id = save_file(file_id, file_name)
     link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
-    await message.reply(
-        f"✅ فایل با موفقیت ذخیره شد.\n📥 لینک دانلود:\n{link}"
-    )
+    await message.reply(f"✅ فایل با موفقیت آپلود و ذخیره شد.
+📥 لینک دانلود:
+{link}")
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
@@ -40,19 +40,19 @@ async def start(client, message):
                 file_data = get_file(int(file_row_id))
                 if file_data:
                     file_id, file_name = file_data
-
-                    notice = await message.reply(
-                        "📌 کاربر عزیز! لطفاً فایل را ذخیره کنید.\n⏳ تا ۳۰ ثانیه دیگر حذف خواهد شد!"
-                    )
-
                     sent_message = await message.reply_video(
                         video=file_id,
-                        caption="🎬 فایل شما آماده است. همین حالا ذخیره‌اش کن!"
-                    )
+                        caption=(
+                            "❗ فایل پس از **دو دقیقه** حذف خواهد شد.
+"
+                            "حتماً ابتدا **دانلود** کنید.
 
-                    await asyncio.sleep(30)
+"
+                            "📌 برای پخش زیرنویس، از **MX Player** استفاده کنید."
+                        )
+                    )
+                    await asyncio.sleep(120)
                     await sent_message.delete()
-                    await notice.delete()
                     await message.delete()
                     return
                 else:
@@ -60,9 +60,10 @@ async def start(client, message):
                     return
         await message.reply("❌ پارامتر شروع نامعتبر است.")
     else:
-        await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.\nمثال:\n/start file_1")
+        await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.
+مثال:
+/start file_1")
 
-# === Flask Server for Render ===
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
