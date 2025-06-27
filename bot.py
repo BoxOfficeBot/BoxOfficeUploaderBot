@@ -4,14 +4,19 @@ import asyncio
 from flask import Flask
 import threading
 
+# اطلاعات ربات
 API_ID = 26438691
 API_HASH = "b9a6835fa0eea6e9f8a87a320b3ab1ae"
 BOT_TOKEN = "8031070707:AAEsIpxZCGtggUPzprlREbWA3aOF-cJb99g"
 
+# آماده‌سازی دیتابیس
 init_db()
 
+# ساخت کلاینت ربات
 app = Client("BoxOfficeUploaderBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+
+# هندل آپلود فایل
 @app.on_message(filters.private & (filters.document | filters.video))
 async def handle_upload(client, message):
     if message.document:
@@ -27,11 +32,18 @@ async def handle_upload(client, message):
     # ذخیره در دیتابیس
     file_row_id = save_file(file_id, file_name)
 
-    # ساخت لینک اختصاصی
-    link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
+    # دریافت یوزرنیم ربات
+    bot_user = await client.get_me()
+    link = f"https://t.me/{bot_user.username}?start=file_{file_row_id}"
 
-    await message.reply(f"✅ فایل با موفقیت آپلود شد!\nلینک دانلود:\n{link}")
+    # ارسال لینک دانلود
+    await message.reply(
+        f"✅ فایل با موفقیت آپلود و ذخیره شد.\n"
+        f"🔗 لینک دریافت فایل:\n{link}"
+    )
 
+
+# هندل دستور start
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     if len(message.command) > 1:
@@ -44,11 +56,11 @@ async def start(client, message):
                     file_id, file_name = file_data
                     caption = (
                         "💙 سلام دوست عزیز!\n"
-                        "⚠️ توجه کنید که بعد از ۳۰ ثانیه پیام حذف می‌شود.\n"
-                        "لطفاً پیام(های) ارسالی را به پیوی خود بفرستید و آنجا مشاهده کنید ❤️\n\n"
-                        "📌 برای نمایش زیرنویس‌ها از نرم‌افزار MX Player استفاده کنید."
+                        "⚠️ توجه کنید که این فایل فقط به مدت ۳۰ ثانیه قابل دسترسی است.\n"
+                        "لطفاً آن را برای خود فوروارد کرده و ذخیره کنید ❤️\n\n"
+                        "📌 برای پخش زیرنویس، از MX Player استفاده کنید."
                     )
-                    if file_id.startswith("BAAC") or file_id.startswith("CAAC"):  # اگر سند بود
+                    if file_id.startswith("BAAC") or file_id.startswith("CAAC"):
                         sent_message = await message.reply_document(document=file_id, caption=caption)
                     else:
                         sent_message = await message.reply_video(video=file_id, caption=caption)
@@ -58,16 +70,24 @@ async def start(client, message):
                     await message.delete()
                     return
                 else:
-                    await message.reply("❌ فایل پیدا نشد.")
+                    await message.reply("❌ فایل مورد نظر یافت نشد.")
                     return
         await message.reply("❌ پارامتر شروع نامعتبر است.")
     else:
-        await message.reply("سلام! لطفاً لینک فیلم را با فرمت صحیح باز کنید.\nمثال:\n/start file_1")
+        await message.reply(
+            "سلام! لطفاً لینک را با پارامتر درست باز کنید.\n"
+            "مثال:\n/start file_1"
+        )
 
-# راه‌اندازی یک سرور ساده Flask برای باز کردن پورت و جلوگیری از ارور Render
+
+# اجرای ربات
+app.start()
+
+
+# سرور فیک برای Render تا پورت باز باشد
 fake_app = Flask(__name__)
 
-@fake_app.route('/')
+@fake_app.route("/")
 def home():
     return "Bot is running."
 
@@ -76,4 +96,5 @@ def run_web():
 
 threading.Thread(target=run_web).start()
 
-app.run()
+# اجرای دائمی Pyrogram
+app.idle()
