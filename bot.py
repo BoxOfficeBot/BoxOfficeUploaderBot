@@ -1,6 +1,8 @@
 from pyrogram import Client, filters
 from database import init_db, save_file, get_file
 import asyncio
+from flask import Flask
+import threading
 
 API_ID = 26438691
 API_HASH = "b9a6835fa0eea6e9f8a87a320b3ab1ae"
@@ -22,12 +24,8 @@ async def handle_upload(client, message):
         await message.reply("فایل باید ویدیو یا سند باشد.")
         return
 
-    # ذخیره در دیتابیس
     file_row_id = save_file(file_id, file_name)
-
-    # ساخت لینک اختصاصی
     link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
-
     await message.reply(f"✅ فایل با موفقیت آپلود و ذخیره شد.\nلینک دانلود:\n{link}")
 
 @app.on_message(filters.command("start") & filters.private)
@@ -46,7 +44,7 @@ async def start(client, message):
                         "لطفاً پیام(های) ارسالی را به پیوی خود بفرستید و آنجا مشاهده کنید ❤️\n\n"
                         "📌 برای نمایش زیرنویس‌ها از نرم‌افزار MX Player استفاده کنید."
                     )
-                    if file_id.startswith("BAAC") or file_id.startswith("CAAC"):  # سند
+                    if file_id.startswith("BAAC") or file_id.startswith("CAAC"):
                         sent_message = await message.reply_document(document=file_id, caption=caption)
                     else:
                         sent_message = await message.reply_video(video=file_id, caption=caption)
@@ -62,11 +60,7 @@ async def start(client, message):
     else:
         await message.reply("سلام! لطفاً لینک فیلم را با فرمت صحیح باز کنید.\nمثال:\n/start file_1")
 
-app.run()
-# فقط برای اینکه Render فکر کنه پورت بازه
-from flask import Flask
-import threading
-
+# ✅ Flask باید قبل از app.run() اجرا بشه
 fake_app = Flask(__name__)
 
 @fake_app.route('/')
@@ -77,3 +71,6 @@ def run_web():
     fake_app.run(host="0.0.0.0", port=10000)
 
 threading.Thread(target=run_web).start()
+
+# حالا بات Pyrogram رو اجرا کن
+app.run()
