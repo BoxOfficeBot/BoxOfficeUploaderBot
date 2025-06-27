@@ -1,7 +1,3 @@
-فایل bot.py
-python
-Kopieren
-Bearbeiten
 from pyrogram import Client, filters
 from database import init_db, save_file, get_file
 import asyncio
@@ -14,7 +10,7 @@ init_db()
 
 app = Client("BoxOfficeUploaderBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-@app.on_message(filters.private & filters.document | filters.video)
+@app.on_message(filters.private & (filters.document | filters.video))
 async def handle_upload(client, message):
     if message.document:
         file_id = message.document.file_id
@@ -44,10 +40,16 @@ async def start(client, message):
                 file_data = get_file(int(file_row_id))
                 if file_data:
                     file_id, file_name = file_data
-                    caption = f"سلام!\nاین فایل به مدت ۳۰ ثانیه برای شما ارسال می‌شود.\nلطفاً ذخیره کنید."
-                    sent_message = await message.reply_video(video=file_id, caption=caption)  # اگر ویدیو بود
-                    # اگر فایل سند بود، از reply_document استفاده کن
-                    # await message.reply_document(document=file_id, caption=caption)
+                    caption = (
+                        "💙 سلام دوست عزیز!\n"
+                        "⚠️ توجه کنید که بعد از 30 ثانیه حذف خواهد شد\n"
+                        "لطفاً پیام(های) ارسالی را به پیوی خود بفرستید و آنجا مشاهده کنید ❤️\n\n"
+                        "📌 برای نمایش زیرنویس‌ها از نرم‌افزار MX Player استفاده کنید."
+                    )
+                    if file_id.startswith("BAAC") or file_id.startswith("CAAC"):  # سند
+                        sent_message = await message.reply_document(document=file_id, caption=caption)
+                    else:
+                        sent_message = await message.reply_video(video=file_id, caption=caption)
 
                     await asyncio.sleep(30)
                     await sent_message.delete()
@@ -58,6 +60,6 @@ async def start(client, message):
                     return
         await message.reply("❌ پارامتر شروع نامعتبر است.")
     else:
-        await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.\nمثال:\n/start file_1")
+        await message.reply("سلام! لطفاً لینک فیلم را با فرمت صحیح باز کنید.\nمثال:\n/start file_1")
 
 app.run()
