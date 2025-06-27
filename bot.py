@@ -63,18 +63,17 @@ async def start(client, message):
         await message.reply("سلام! لطفاً لینک فیلم را با فرمت صحیح باز کنید.\nمثال:\n/start file_1")
 
 app.run()
-
-# --- Keep Render alive by faking a port ---
+# فقط برای اینکه Render فکر کنه پورت بازه
 from flask import Flask
 import threading
 
-fake_app = Flask("")
+fake_app = Flask(__name__)
 
 @fake_app.route('/')
 def home():
-    return "Bot is running!"
+    return "Bot is running."
 
-def run_flask():
+def run_web():
     fake_app.run(host="0.0.0.0", port=10000)
 
-threading.Thread(target=run_flask).start()
+threading.Thread(target=run_web).start()
