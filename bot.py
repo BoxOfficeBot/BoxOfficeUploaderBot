@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from database import init_db, save_file, get_file, has_seen_welcome, mark_welcome_seen
+from database import init_db, save_file, get_file
 import asyncio
 from flask import Flask
 import threading
@@ -7,41 +7,44 @@ import threading
 API_ID = 26438691
 API_HASH = "b9a6835fa0eea6e9f8a87a320b3ab1ae"
 BOT_TOKEN = "8031070707:AAEsIpxZCGtggUPzprlREbWA3aOF-cJb99g"
-ADMIN_ID = 7872708405  # ادمین
+ADMIN_ID = 7872708405  # Mehdi
 
 init_db()
 app = Client("BoxOfficeUploaderBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# دریافت فایل فقط از ادمین
+shown_welcome = set()
+
 @app.on_message(filters.private & (filters.document | filters.video))
 async def handle_upload(client, message):
     if message.from_user.id != ADMIN_ID:
         await message.reply("❌ شما اجازه‌ی آپلود فایل ندارید.")
         return
 
-    if message.document:
-        file_id = message.document.file_id
-        file_name = message.document.file_name or "file"
-    elif message.video:
-        file_id = message.video.file_id
-        file_name = message.video.file_name or "video.mp4"
-    else:
-        await message.reply("❌ فقط فایل ویدیو یا سند قابل قبول است.")
-        return
+    if message.from_user.id not in shown_welcome:
+        shown_welcome.add(message.from_user.id)
+        await message.reply_photo(
+            photo="https://i.ibb.co/fFDsVqt/welcome.jpg",
+            caption=(
+                "🎬✨ **به دنیای فیلم و سریال خوش اومدی!** ✨🎬\n\n"
+                "🍿 اینجا باکس‌آفیسه؛ جایی برای عاشقای سینما! 🎥💥\n"
+                "🔥 جدیدترین فیلم‌ها و سریال‌ها با لینک اختصاصی برات آماده‌ست!\n"
+                "📲 فقط کافیه دانلود کنی و لذت ببری...\n\n"
+                "💡 نکته مهم: لینک دانلودت فقط تا **۳۰ ثانیه** فعاله!⏳ زود سیوش کن! 💾\n\n"
+                "❤️ ممنون که با ما همراهی! 🖤"
+            )
+        )
 
+    file_id = message.document.file_id if message.document else message.video.file_id
+    file_name = message.document.file_name if message.document else message.video.file_name or "video.mp4"
+    
     file_row_id = save_file(file_id, file_name)
     link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
     await message.reply(
-        f"✅ فایل با موفقیت ذخیره شد!\n\n📥 لینک دانلود اختصاصی شما:\n{link}"
+        f"✅ فایل با موفقیت ذخیره شد!\n\n📥 **لینک دانلود اختصاصی تو:**\n👉 {link}"
     )
-
-# ذخیره وضعیت خوش‌آمدگویی کاربران
-user_welcome_seen = set()
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
-    user_id = message.from_user.id
-    # بررسی پارامتر
     if len(message.command) > 1:
         param = message.command[1]
         if param.startswith("file_"):
@@ -50,21 +53,6 @@ async def start(client, message):
                 file_data = get_file(int(file_row_id))
                 if file_data:
                     file_id, file_name = file_data
-                    # اگر کاربر بار اول هست، خوش آمد بگو
-                    if user_id not in user_welcome_seen:
-                        await message.reply_photo(
-                            photo="https://i.ibb.co/fFDsVqt/welcome.jpg",
-                            caption=(
-                                "🎬✨ به دنیای فیلم و سریال خوش اومدی! ✨🎬\n\n"
-                                "🍿 اینجا باکس‌آفیسه؛ جایی برای عاشقای سینما! 🎥💥\n"
-                                "🔥 جدیدترین فیلم‌ها و سریال‌ها با لینک اختصاصی برات آماده‌ست!\n"
-                                "📲 فقط کافیه دانلود کنی و لذت ببری...\n\n"
-                                "💡 لینک دانلودت فقط تا **۳۰ ثانیه** فعاله!⏳ زود سیوش کن! 💾\n\n"
-                                "❤️ ممنون که با ما همراهی! 🖤"
-                            )
-                        )
-                        user_welcome_seen.add(user_id)
-
                     notice = await message.reply(
                         "📌 کاربر عزیز! لطفاً فایل را ذخیره کنید.\n⏳ تا ۳۰ ثانیه دیگر حذف خواهد شد!"
                     )
@@ -84,9 +72,8 @@ async def start(client, message):
     else:
         await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.\nمثال:\n/start file_1")
 
-# Flask server برای Render
+# === Flask server for Render.com ===
 flask_app = Flask(__name__)
-
 @flask_app.route('/')
 def home():
     return "Bot is running!"
