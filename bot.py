@@ -1,5 +1,4 @@
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import init_db, save_file, get_file
 import asyncio
 import threading
@@ -18,22 +17,18 @@ async def handle_upload(client, message):
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name or "file"
+        file_type = "document"
     elif message.video:
         file_id = message.video.file_id
         file_name = message.video.file_name or "video.mp4"
+        file_type = "video"
     else:
         await message.reply("فایل باید ویدیو یا سند باشد.")
         return
 
-    file_row_id = save_file(file_id, file_name)
-    bot_info = await client.get_me()
-    link = f"https://t.me/{bot_info.username}?start=file_{file_row_id}"
-
-    button = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📥 برای دانلود این فیلم کلیک کنید", url=link)]
-    ])
-
-    await message.reply("✅ فایل با موفقیت آپلود شد!", reply_markup=button)
+    file_row_id = save_file(file_id, file_name, file_type)
+    link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
+    await message.reply(f"✅ فایل با موفقیت آپلود شد!\n📥 لینک دانلود:\n{link}")
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
@@ -44,7 +39,7 @@ async def start(client, message):
             if file_row_id.isdigit():
                 file_data = get_file(int(file_row_id))
                 if file_data:
-                    file_id, file_name = file_data
+                    file_id, file_name, file_type = file_data
                     caption = (
                         "💙 سلام دوست عزیز!\n"
                         "⚠️ این فایل فقط 30 ثانیه قابل دسترسی است.\n"
@@ -52,10 +47,13 @@ async def start(client, message):
                         "📌 پیشنهاد: برای نمایش زیرنویس از MX Player استفاده کنید."
                     )
                     try:
-                        if file_name.endswith(".mp4"):
+                        if file_type == "document":
+                            sent_message = await message.reply_document(document=file_id, caption=caption)
+                        elif file_type == "video":
                             sent_message = await message.reply_video(video=file_id, caption=caption)
                         else:
-                            sent_message = await message.reply_document(document=file_id, caption=caption)
+                            await message.reply("نوع فایل نامشخص است.")
+                            return
                     except Exception as e:
                         await message.reply(f"خطا در ارسال فایل: {e}")
                         return
