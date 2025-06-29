@@ -1,9 +1,9 @@
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import init_db, save_file, get_file
 import asyncio
 import threading
 from flask import Flask
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 API_ID = 26438691
 API_HASH = "b9a6835fa0eea6e9f8a87a320b3ab1ae"
@@ -26,16 +26,14 @@ async def handle_upload(client, message):
         return
 
     file_row_id = save_file(file_id, file_name)
-    link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
+    bot_info = await client.get_me()
+    link = f"https://t.me/{bot_info.username}?start=file_{file_row_id}"
 
     button = InlineKeyboardMarkup([
         [InlineKeyboardButton("📥 برای دانلود این فیلم کلیک کنید", url=link)]
     ])
 
-    await message.reply(
-        "✅ فایل با موفقیت آپلود شد!",
-        reply_markup=button
-    )
+    await message.reply("✅ فایل با موفقیت آپلود شد!", reply_markup=button)
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
@@ -47,7 +45,6 @@ async def start(client, message):
                 file_data = get_file(int(file_row_id))
                 if file_data:
                     file_id, file_name = file_data
-                    file_type = "document" if file_name.endswith(".pdf") else "video"
                     caption = (
                         "💙 سلام دوست عزیز!\n"
                         "⚠️ این فایل فقط 30 ثانیه قابل دسترسی است.\n"
@@ -55,10 +52,10 @@ async def start(client, message):
                         "📌 پیشنهاد: برای نمایش زیرنویس از MX Player استفاده کنید."
                     )
                     try:
-                        if file_type == "document":
-                            sent_message = await message.reply_document(document=file_id, caption=caption)
-                        else:
+                        if file_name.endswith(".mp4"):
                             sent_message = await message.reply_video(video=file_id, caption=caption)
+                        else:
+                            sent_message = await message.reply_document(document=file_id, caption=caption)
                     except Exception as e:
                         await message.reply(f"خطا در ارسال فایل: {e}")
                         return
