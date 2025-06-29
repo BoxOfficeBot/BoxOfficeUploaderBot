@@ -1,6 +1,3 @@
-database
-
-
 import sqlite3
 
 def init_db():
@@ -20,8 +17,7 @@ def init_db():
 def save_file(file_id, file_name, file_type):
     conn = sqlite3.connect("files.db")
     c = conn.cursor()
-    c.execute("INSERT INTO files (file_id, file_name, file_type) VALUES (?, ?, ?)",
-              (file_id, file_name, file_type))
+    c.execute("INSERT INTO files (file_id, file_name, file_type) VALUES (?, ?, ?)", (file_id, file_name, file_type))
     conn.commit()
     file_row_id = c.lastrowid
     conn.close()
