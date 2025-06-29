@@ -7,16 +7,18 @@ def init_db():
         CREATE TABLE IF NOT EXISTS files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_id TEXT NOT NULL,
-            file_name TEXT NOT NULL
+            file_name TEXT NOT NULL,
+            file_type TEXT NOT NULL
         )
     """)
     conn.commit()
     conn.close()
 
-def save_file(file_id, file_name):
+def save_file(file_id, file_name, file_type):
     conn = sqlite3.connect("files.db")
     c = conn.cursor()
-    c.execute("INSERT INTO files (file_id, file_name) VALUES (?, ?)", (file_id, file_name))
+    c.execute("INSERT INTO files (file_id, file_name, file_type) VALUES (?, ?, ?)",
+              (file_id, file_name, file_type))
     conn.commit()
     file_row_id = c.lastrowid
     conn.close()
@@ -25,7 +27,7 @@ def save_file(file_id, file_name):
 def get_file(file_row_id):
     conn = sqlite3.connect("files.db")
     c = conn.cursor()
-    c.execute("SELECT file_id, file_name FROM files WHERE id=?", (file_row_id,))
+    c.execute("SELECT file_id, file_name, file_type FROM files WHERE id=?", (file_row_id,))
     result = c.fetchone()
     conn.close()
     return result
