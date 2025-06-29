@@ -1,4 +1,5 @@
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import init_db, save_file, get_file
 import asyncio
 import threading
@@ -7,6 +8,7 @@ from flask import Flask
 API_ID = 26438691
 API_HASH = "b9a6835fa0eea6e9f8a87a320b3ab1ae"
 BOT_TOKEN = "8031070707:AAEsIpxZCGtggUPzprlREbWA3aOF-cJb99g"
+CHANNEL_ID = -1002719497085  # آیدی عددی کانال شما
 
 init_db()
 
@@ -23,12 +25,35 @@ async def handle_upload(client, message):
         file_name = message.video.file_name or "video.mp4"
         file_type = "video"
     else:
-        await message.reply("فایل باید ویدیو یا سند باشد.")
+        await message.reply("❌ فقط فایل‌های ویدیو یا سند مجاز هستند.")
         return
 
     file_row_id = save_file(file_id, file_name, file_type)
     link = f"https://t.me/{client.me.username}?start=file_{file_row_id}"
-    await message.reply(f"✅ فایل با موفقیت آپلود شد!\n📥 لینک دانلود:\n{link}")
+
+    # دکمه لینک
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎬 برای دانلود این فیلم کلیک کنید", url=link)]
+    ])
+
+    # متن پست کانال
+    caption = (
+        f"🎬 فیلم: **{file_name}**\n\n"
+        "📽️ فایل آماده دانلود است. روی دکمه زیر کلیک کن:\n\n"
+        "⏳ فقط برای مدت محدود فعال است!\n"
+        "━━━━━━━━━━━━━"
+    )
+
+    try:
+        await client.send_message(
+            chat_id=CHANNEL_ID,
+            text=caption,
+            reply_markup=keyboard,
+            parse_mode="markdown"
+        )
+        await message.reply(f"✅ فایل با موفقیت آپلود شد و به کانال ارسال شد!\n📥 لینک مخفی شده:\n{link}")
+    except Exception as e:
+        await message.reply(f"❌ خطا در ارسال به کانال:\n{e}")
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
@@ -52,10 +77,10 @@ async def start(client, message):
                         elif file_type == "video":
                             sent_message = await message.reply_video(video=file_id, caption=caption)
                         else:
-                            await message.reply("نوع فایل نامشخص است.")
+                            await message.reply("❌ نوع فایل ناشناخته است.")
                             return
                     except Exception as e:
-                        await message.reply(f"خطا در ارسال فایل: {e}")
+                        await message.reply(f"❌ خطا در ارسال فایل: {e}")
                         return
 
                     await asyncio.sleep(30)
@@ -69,7 +94,7 @@ async def start(client, message):
     else:
         await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.\nمثال:\n/start file_1")
 
-# اجرای Flask روی پورت 10000 برای Render
+# Flask برای روشن نگه‌داشتن ربات در Render
 fake_app = Flask(__name__)
 
 @fake_app.route('/')
@@ -79,8 +104,7 @@ def home():
 def run_web():
     fake_app.run(host="0.0.0.0", port=10000)
 
-# اجرای Flask در یک Thread جدا
 threading.Thread(target=run_web).start()
 
-# اجرای Pyrogram
+# اجرای ربات Pyrogram
 app.run()
