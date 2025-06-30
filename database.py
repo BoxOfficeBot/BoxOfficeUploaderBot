@@ -19,9 +19,9 @@ def save_file(file_id, file_name, file_type):
     c = conn.cursor()
     c.execute("INSERT INTO files (file_id, file_name, file_type) VALUES (?, ?, ?)", (file_id, file_name, file_type))
     conn.commit()
-    file_row_id = c.lastrowid
+    row_id = c.lastrowid
     conn.close()
-    return file_row_id
+    return row_id
 
 def get_file(file_row_id):
     conn = sqlite3.connect("files.db")
