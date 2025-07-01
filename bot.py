@@ -34,42 +34,59 @@ async def handle_upload(client, message):
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
+    user = message.from_user
+    name = user.first_name or "کاربر عزیز"
+    username = user.username or "کاربر"
+
+    # پیام خوش‌آمدگویی با اسم یا یوزرنیم
+    welcome_text = f"""
+🎉 خوش اومدی {name} عزیز! 💖
+
+🔐 این ربات بهت امکان میده ویدیوها و فایل‌هاتو خیلی راحت و امن دریافت کنی!
+📦 لینک‌هایی که می‌گیری فقط 30 ثانیه اعتبار دارن ⏳
+
+⚡️ آماده‌ای؟ بزن بریم! 🚀
+"""
+    await message.reply_photo(
+        photo="https://telegra.ph/file/6b9a31dd77ad04e3b84ef.jpg",
+        caption=welcome_text
+    )
+
     if len(message.command) > 1:
         param = message.command[1]
         if param.startswith("file_"):
             file_row_id = param.split("_")[1]
-            if file_row_id.isdigit():
-                file_data = get_file(int(file_row_id))
-                if file_data:
-                    file_id, file_name, file_type = file_data
-                    caption = (
-                        "💙 سلام دوست عزیز!\n"
-                        "⚠️ این فایل فقط 30 ثانیه قابل دسترسی است.\n"
-                        "لطفاً آن را به پیوی خود بفرستید یا ذخیره کنید.\n\n"
-                        "📌 پیشنهاد: برای نمایش زیرنویس از MX Player استفاده کنید."
-                    )
-                    try:
-                        if file_type == "document":
-                            sent_message = await message.reply_document(document=file_id, caption=caption)
-                        elif file_type == "video":
-                            sent_message = await message.reply_video(video=file_id, caption=caption)
-                        else:
-                            await message.reply("نوع فایل نامشخص است.")
-                            return
-                    except Exception as e:
-                        await message.reply(f"خطا در ارسال فایل: {e}")
+            file_data = get_file(file_row_id)
+            if file_data:
+                file_id, file_name, file_type = file_data
+                file_caption = file_name or "📁 فایل شما آماده است."
+                try:
+                    if file_type == "document":
+                        sent_message = await message.reply_document(document=file_id, caption=file_caption)
+                    elif file_type == "video":
+                        sent_message = await message.reply_video(video=file_id, caption=file_caption)
+                    else:
+                        await message.reply("نوع فایل نامشخص است.")
                         return
+                except Exception as e:
+                    await message.reply(f"خطا در ارسال فایل: {e}")
+                    return
 
-                    await asyncio.sleep(30)
-                    await sent_message.delete()
-                    await message.delete()
-                    return
-                else:
-                    await message.reply("❌ فایل پیدا نشد.")
-                    return
+                warning_msg = await message.reply(
+                    "⏳ فقط 30 ثانیه وقت داری! 😱\n📥 سریع فایل رو ذخیره کن یا بفرست به خودت!\n🔥 بعدش پاک میشه و از دستت میره! 🚫"
+                )
+
+                await asyncio.sleep(30)
+                await sent_message.delete()
+                await warning_msg.delete()
+                await message.delete()
+                return
+            else:
+                await message.reply("❌ فایل پیدا نشد.")
+                return
         await message.reply("❌ پارامتر شروع نامعتبر است.")
     else:
-        await message.reply("سلام! لطفاً لینک را با پارامتر صحیح باز کنید.\nمثال:\n/start file_1")
+        await message.reply("سلام رفیق! 🤗\nلطفاً لینک رو درست باز کن تا فایلتو بگیری.\nمثال:\n/start file_1")
 
 fake_app = Flask(__name__)
 
