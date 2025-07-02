@@ -1,128 +1,149 @@
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import init_db, save_file, get_file, schedule_file, get_scheduled_files
-import asyncio
-import threading
-from flask import Flask
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.base import JobLookupError
+# directory: BoxOfficeUploaderBot
+
+# 1. requirements.txt
+'''
+pyrogram
+Flask
+APScheduler
+tgcrypto
+pytz
+pyaes==1.6.1
+pysocks==1.7.1
+'''
+
+# 2. database.py
+from pymongo import MongoClient
 from datetime import datetime
+import os
+
+MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient(MONGO_URI)
+db = client["BoxOffice"]
+collection = db["files"]
+
+def init_db():
+    db.command("ping")
+
+def save_file(file_id, caption, file_type, unique_id, schedule_time=None, channel_id=None):
+    collection.insert_one({
+        "file_id": file_id,
+        "caption": caption,
+        "file_type": file_type,
+        "unique_id": unique_id,
+        "schedule_time": schedule_time,
+        "channel_id": channel_id,
+        "created_at": datetime.utcnow()
+    })
+
+def get_file(unique_id):
+    return collection.find_one({"unique_id": unique_id})
+
+def schedule_file(unique_id, schedule_time, channel_id):
+    collection.update_one(
+        {"unique_id": unique_id},
+        {"$set": {"schedule_time": schedule_time, "channel_id": channel_id}}
+    )
+
+def get_scheduled_files():
+    return list(collection.find({"schedule_time": {"$ne": None}}))
+
+
+# 3. scheduler.py
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+from pyrogram import Client
+from database import get_scheduled_files
+import asyncio
 import pytz
 
-API_ID = 26438691
-API_HASH = "b9a6835fa0eea6e9f8a87a320b3ab1ae"
-BOT_TOKEN = "8031070707:AAEsIpxZCGtggUPzprlREbWA3aOF-cJb99g"
-ADMIN_ID = 5109533656
+scheduler = BackgroundScheduler()
 
-CHANNELS = {
-    "🎬 BoxOffice Irani": -1002422139602,
-    "🎞️ BoxOffice Moviiie": -1002601782167,
-    "🐉 BoxOffice Animation": -1002573288143
-}
+async def send_scheduled_files(bot):
+    files = get_scheduled_files()
+    now = datetime.now(pytz.utc)
+    for file in files:
+        if file['schedule_time'] <= now:
+            try:
+                await bot.send_document(
+                    chat_id=file['channel_id'],
+                    document=file['file_id'],
+                    caption=file['caption']
+                )
+            except Exception as e:
+                print("Error sending scheduled file:", e)
 
-init_db()
-app = Client("BoxOfficeUploaderBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-scheduler = BackgroundScheduler(timezone="Europe/Berlin")
+scheduler.add_job(lambda: asyncio.run(send_scheduled_files(Client("bot"))), 'interval', minutes=1)
 scheduler.start()
 
 
-@app.on_message(filters.private & (filters.document | filters.video))
-async def handle_upload(client, message):
-    if message.from_user.id != ADMIN_ID:
-        await message.reply("❌ فقط ادمین مجاز به آپلود فایل است.")
-        return
+# 4. bot.py
+import os
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from database import init_db, save_file, get_file, schedule_file
+from flask import Flask
+from datetime import datetime
+import pytz
 
-    if message.document:
-        file_id = message.document.file_id
-        file_name = message.document.file_name or "file"
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
+bot_token = os.getenv("BOT_TOKEN")
+MONGO_URI = os.getenv("MONGO_URI")
+
+init_db()
+bot = Client("bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
+
+@bot.on_message(filters.document & filters.private)
+async def handle_file(client: Client, message: Message):
+    await message.reply("لطفاً یک شناسه یکتا برای این فایل ارسال کنید:")
+    file_msg = message
+
+    @bot.on_message(filters.text & filters.private)
+    async def get_unique_id(_, msg):
+        unique_id = msg.text.strip()
+        file_id = file_msg.document.file_id
+        caption = file_msg.caption or ""
         file_type = "document"
-    elif message.video:
-        file_id = message.video.file_id
-        file_name = message.video.file_name or "video.mp4"
-        file_type = "video"
-    else:
-        await message.reply("فایل باید ویدیو یا سند باشد.")
-        return
+        save_file(file_id, caption, file_type, unique_id)
+        await msg.reply("✅ فایل با موفقیت ذخیره شد!")
 
-    file_row_id = save_file(file_id, file_name, file_type)
-    bot_info = await client.get_me()
-    username = bot_info.username
-    link = f"https://t.me/{username}?start=file_{file_row_id}"
+        bot.remove_handler(get_unique_id)
 
-    # ✅ اصلاح‌شده: نمایش لینک به صورت کامل
-    await message.reply(f"✅ فایل با موفقیت آپلود شد!\n📥 لینک دانلود:\n{link}")
+@bot.on_message(filters.command("get") & filters.private)
+async def send_file(client: Client, message: Message):
+    if len(message.command) < 2:
+        return await message.reply("لطفاً شناسه یکتا را وارد کنید. مثال: /get ID123")
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(name, callback_data=f"channel_{file_row_id}_{chat_id}")]
-        for name, chat_id in CHANNELS.items()
-    ])
-    await message.reply("📢 لطفاً کانالی که می‌خوای فایل توش منتشر بشه رو انتخاب کن:", reply_markup=keyboard)
+    unique_id = message.command[1]
+    file_data = get_file(unique_id)
 
-
-@app.on_callback_query(filters.regex(r"^channel_(\d+)_(\-\d+)$"))
-async def select_channel(client, callback_query):
-    file_row_id, chat_id = map(int, callback_query.data.split("_")[1:])
-    await callback_query.message.edit("🕐 لطفاً زمان ارسال فایل رو به صورت `YYYY-MM-DD HH:MM` وارد کن:", parse_mode="markdown")
-    app.db_state = {callback_query.from_user.id: {"file_id": file_row_id, "chat_id": chat_id}}
-
-
-@app.on_message(filters.private & filters.text)
-async def set_schedule(client, message):
-    state = getattr(app, "db_state", {}).get(message.from_user.id)
-    if not state:
-        return
-
-    try:
-        run_at = datetime.strptime(message.text.strip(), "%Y-%m-%d %H:%M")
-        run_at = pytz.timezone("Europe/Berlin").localize(run_at)
-    except Exception:
-        await message.reply("❌ فرمت زمان اشتباهه. لطفاً به صورت `YYYY-MM-DD HH:MM` بنویس.", parse_mode="markdown")
-        return
-
-    file_data = get_file(state["file_id"])
     if not file_data:
-        await message.reply("❌ فایل پیدا نشد.")
-        return
+        return await message.reply("فایلی با این شناسه پیدا نشد.")
 
-    schedule_file(state["file_id"], run_at.isoformat(), state["chat_id"])
-
-    scheduler.add_job(
-        func=send_scheduled_file,
-        trigger="date",
-        run_date=run_at,
-        args=[state["file_id"]],
-        id=f"job_{state['file_id']}"
+    await message.reply_document(
+        document=file_data['file_id'],
+        caption=file_data['caption']
     )
 
-    await message.reply("📅 زمان‌بندی با موفقیت انجام شد ✅")
-    del app.db_state[message.from_user.id]
+app = Flask(__name__)
 
-
-async def send_scheduled_file(file_id):
-    file_data = get_file(file_id)
-    if not file_data:
-        return
-    file_id, file_name, file_type, schedule_time, channel_id = file_data
-    caption = f"🎬 {file_name}"
-    try:
-        if file_type == "document":
-            await app.send_document(channel_id, document=file_id, caption=caption)
-        elif file_type == "video":
-            await app.send_video(channel_id, video=file_id, caption=caption)
-    except Exception as e:
-        print(f"خطا در ارسال فایل برنامه‌ریزی‌شده: {e}")
-
-
-fake_app = Flask(__name__)
-
-@fake_app.route('/')
+@app.route('/')
 def home():
-    return "Bot is running."
+    return 'Bot is running!'
+
+bot.start()
+app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
 
-def run_web():
-    fake_app.run(host="0.0.0.0", port=10000)
+# 5. .env (locally, do NOT push this to GitHub)
+'''
+API_ID=your_api_id
+API_HASH=your_api_hash
+BOT_TOKEN=your_bot_token
+MONGO_URI=mongodb+srv://smilymeh:M@hdi1985!@cluster0.ve2f0zq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+PORT=10000
+'''
 
 
-threading.Thread(target=run_web).start()
-app.run()
+# نکته:
+# در render.com باید این متغیرها رو تو بخش Environment اضافه کنی نه داخل فایل .env واقعی
