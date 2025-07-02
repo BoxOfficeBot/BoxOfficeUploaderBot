@@ -1,5 +1,7 @@
 pyrogram
-tgcrypto
 Flask
 APScheduler
+tgcrypto
 pytz
+pyaes==1.6.1
+pysocks==1.7.1
